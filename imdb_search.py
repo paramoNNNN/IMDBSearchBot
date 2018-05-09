@@ -36,6 +36,8 @@ def on_chat_message(msg):
     if 'from' in msg:
         if 'username' in msg['from']:
             username = msg['from']['username']
+        else:
+            username = msg['from']['first_name']
     elif msg['chat']['type'] == "channel":
         username = msg['chat']['username']
     else:
@@ -70,9 +72,9 @@ def on_chat_message(msg):
 
             title = soup.find('h1', {'itemprop': 'name'}).text
 
-            cur.execute("INSERT INTO movies(imdb_id, movie_name, url, is_correct, submitted_by) VALUES(?, ?, ?, ?, ?)", (imdb_id, title, msg_text, 'false', username))
+            cur.execute("INSERT INTO movies(imdb_id, movie_name, url, is_correct, submitted_by) VALUES(?, ?, ?, ?, ?)", (imdb_id, title, msg_text, 'false', user_id))
             con.commit()
-            bot.sendMessage(chat_id, "downloads links shows after confirmation")
+            bot.sendMessage(chat_id, "your link will be accessible after confirmation")
             return
 
         if '/start' == msg_text:
@@ -80,19 +82,19 @@ def on_chat_message(msg):
 
         elif msg_text.startswith('/r'):
             url_id = msg_text[2:]
-            cur.execute("SELECT * FROM reports WHERE url_id = ? and reported_by = ? and status = ?", (url_id, username, 'false'))
+            cur.execute("SELECT * FROM reports WHERE url_id = ? and reported_by = ? and status = ?", (url_id, user_id, 'false'))
             result = cur.fetchall()
             if len(result) > 0:
                 bot.sendMessage(chat_id, "Your report has already submitted")
                 return
             else:
-                cur.execute("INSERT INTO reports(url_id, reported_by, status, message_id) VALUES(?, ?, ?, ?)", (url_id, username, 'false', msg['message_id']))
+                cur.execute("INSERT INTO reports(url_id, reported_by, status, message_id) VALUES(?, ?, ?, ?)", (url_id, user_id, 'false', msg['message_id']))
                 con.commit()
                 bot.sendMessage(chat_id, "Thanks, We'll check that as soon as possible")
 
         elif '/watchlist' == msg_text:
             cur.execute("SELECT * FROM watchlist WHERE user_id = ?", (user_id,))
-            result = cur.fetchall();
+            result = cur.fetchall()
 
             result_to_send = "Your Watchlist: " + "\n"
             for idx, item in enumerate(result):
@@ -143,10 +145,10 @@ def on_chat_message(msg):
                     bot.sendMessage(chat_id, "This user blocked bot: " + str(item[0]) + ", " + item[1])
                 time.sleep(0.2)
 
-        elif '/check_reports' == msg_text and (username == "paramoNNN"):
+        elif '/check_reports' == msg_text and (user_id == 516036245):
             cur.execute("SELECT * FROM reports WHERE status = ?", ('false',))
             result = cur.fetchall()
-
+            
             if len(result) == 0:
                 bot.sendMessage(chat_id, "Nothing Found! 😞")
 
@@ -154,10 +156,13 @@ def on_chat_message(msg):
                 cur.execute("SELECT url FROM movies WHERE Id = ?", (report[1],))
                 url = cur.fetchone()
 
+                cur.execute("SELECT Username FROM members WHERE Id = ?", (user_id,))
+                username = cur.fetchone();
+
                 result_to_send = '*' + str(idx + 1) + '.*' + '\n' + \
                                   '🔗*Download Link:* ' + '[Download](' + url[0] + ')' + '\n' + \
-                                  '✅*Submitted By: @' + report[2] + '*\n'
-                print(result_to_send)
+                                  '✅*Submitted By:* @' + username[0] + '\n'
+
                 keyboardi = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="It's Broken",
                      callback_data="ra" + str(report[0]) + ":" + str(report[1]) + ":" + str(report[2]))
@@ -169,7 +174,7 @@ def on_chat_message(msg):
 
                 bot.sendMessage(chat_id, result_to_send, parse_mode="Markdown", reply_markup=keyboardi)
 
-        elif '/check_links' == msg_text and (username == "paramoNNN" or username == "Amirhosseinn_i"):
+        elif '/check_links' == msg_text and (user_id == "516036245"):
             cur.execute("SELECT * FROM movies WHERE is_correct = ?", ('false',))
             result = cur.fetchall()
 
@@ -177,10 +182,13 @@ def on_chat_message(msg):
                 bot.sendMessage(chat_id, "Nothing Found! 😞")
 
             for val in result:
+                cur.execute("SELECT Username FROM members WHERE Id = ?", (user_id,))
+                username = cur.fetchone()
+
                 result_to_send = "🔗IMDb Link: http://imdb.com/title/" + str(val[1]) + "\n" +\
                                  "📄Title: " + val[2] + "\n" +\
                                  "⬇️Download Link: " + val[3] + "\n" +\
-                                 "✅Submitted By: " + "@" + val[5]
+                                 "✅Submitted By: " + "@" + username[0]
 
                 keyboardi = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Accept",
@@ -198,11 +206,11 @@ def on_chat_message(msg):
             cur.execute("SELECT * FROM watchlist WHERE user_id = ? and movie_id = ?", (user_id, msg_text[2:],))
             result = cur.fetchall()
             if len(result) == 0:
-                watchlist_keyboard =  [InlineKeyboardButton(text="Add to Watchlist",
+                watchlist_keyboard = [InlineKeyboardButton(text="Add to Watchlist",
                                 callback_data="wa" + msg_text[2:] + ":" + result_to_send['title'])
                              ]
             elif len(result) != 0:
-                watchlist_keyboard =  [InlineKeyboardButton(text="Remove from Watchlist",
+                watchlist_keyboard = [InlineKeyboardButton(text="Remove from Watchlist",
                                 callback_data="wr" + msg_text[2:] + ":" + result_to_send['title'])
                              ]
 
@@ -314,13 +322,13 @@ def on_callback_query(msg):
         data = msg['data'][2:].split(':')
         report_id = data[0]
         movie_id = data[1]
-        username = data[2]
+        user_id = data[2]
 
         cur.execute("UPDATE reports set status = ? WHERE Id = ?", ('broken', report_id,))
         cur.execute("UPDATE movies set is_correct = ? WHERE Id = ?", ('broken', movie_id,))
         con.commit()
 
-        cur.execute("SELECT Id FROM members WHERE username = ?", (username,))
+        cur.execute("SELECT Id FROM members WHERE Id = ?", (user_id,))
         result = cur.fetchone()
 
         cur.execute("SELECT message_id FROM reports WHERE Id = ?", (report_id,))
@@ -333,18 +341,22 @@ def on_callback_query(msg):
         bot.answerCallbackQuery(query_id, text="Successfully accepted")
 
         if result is not None:
-            bot.sendMessage(result[0], "🚫This link you reported its broken and we deleted it. thanks for your report", reply_to_message_id=message_id)
+            # bot.sendMessage(result[0], "🚫This link you reported its broken and we deleted it. thanks for your report", reply_to_message_id=message_id)
+            cur.execute("SELECT imdb_id FROM movies WHERE Id = ?", (movie_id,))
+            imdb_id = cur.fetchone()[0]
+            bot.sendMessage(result[0], "🚫This link you reported its broken and we deleted it. thanks for your report \n ➕MoreInfo: /m" + imdb_id)
 
     elif msg['data'].startswith('rd'):
         data = msg['data'][2:].split(':')
         report_id = data[0]
         movie_id = data[1]
-        username = data[2]
+        user_id = data[2]
 
         cur.execute("UPDATE reports set status = ? WHERE Id = ?", ('n', report_id,))
-        con.commit();
+        cur.execute("UPDATE movies set is_correct = ? WHERE Id = ?", ('true', movie_id,))
+        con.commit()
 
-        cur.execute("SELECT Id FROM members WHERE username = ?", (username,))
+        cur.execute("SELECT Id FROM members WHERE Id = ?", (user_id,))
         result = cur.fetchone()
 
         cur.execute("SELECT message_id FROM reports WHERE Id = ?", (report_id,))
@@ -357,7 +369,10 @@ def on_callback_query(msg):
         bot.answerCallbackQuery(query_id, text="Successfully declined")
 
         if result is not None:
-            bot.sendMessage(result[0], "✅This link you reported its ok and nothing to do. thanks for your report", reply_to_message_id=message_id)
+            # bot.sendMessage(result[0], "✅This link you reported is ok and nothing to do. thanks for your report", reply_to_message_id=message_id)
+            cur.execute("SELECT imdb_id FROM movies WHERE Id = ?", (movie_id,))
+            imdb_id = cur.fetchone()[0]
+            bot.sendMessage(result[0], "✅This link you reported is ok and nothing to do. thanks for your report \n ➕MoreInfo: /m" + imdb_id)
 
     elif msg['data'].startswith('m'):
         result_to_send = get_movie_info(msg['data'][1:])
@@ -417,7 +432,7 @@ def on_callback_query(msg):
         for idx, val in enumerate(links):
             result_to_send += "*" + str(idx + 1) + ". *" + "\n" +\
                               "🔗*Download Link:* " + "[Download]" + "(" + str(val[1]) + ")" + "\n" +\
-                              "🚫*Report Link:* " + "/r" + str(val[0]) + "\n" + "\n"
+                              "🚫*Report:* " + "/r" + str(val[0]) + "\n" + "\n"
 
         if result_to_send == "":
             result_to_send = "Nothing Found! 😞"
@@ -484,7 +499,7 @@ def get_movie_info(imdb_id):
     soup = BeautifulSoup(response.text, 'html.parser')
 
     if soup.find('title').text == "404 Error - IMDb":
-        bot.sendMessage(chat_id, "Nothing Found! 😞")
+        # bot.sendMessage(chat_id, "Nothing Found! 😞")
         return
 
     title = soup.find('h1', {'itemprop': 'name'}).text
