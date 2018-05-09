@@ -174,7 +174,7 @@ def on_chat_message(msg):
 
                 bot.sendMessage(chat_id, result_to_send, parse_mode="Markdown", reply_markup=keyboardi)
 
-        elif '/check_links' == msg_text and (user_id == "516036245"):
+        elif '/check_links' == msg_text and (user_id == 516036245):
             cur.execute("SELECT * FROM movies WHERE is_correct = ?", ('false',))
             result = cur.fetchall()
 
