@@ -1,2 +1,2 @@
 # IMDBSearchBot
-## IMDB Seach Telegram Bot
+### IMDB Telegram Bot with Watchlist
